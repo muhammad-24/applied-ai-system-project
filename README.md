@@ -1,144 +1,53 @@
-# 🎵 Music Recommender Simulation
+Music Recommender + Reliability Layer
+Base Project
 
-## Project Summary
+This project extends my Module 3 Music Recommender Simulation. The original project was a content-based music recommender: it represented songs and a user "taste profile" as data, then used a weighted scoring rule (genre, mood, and energy closeness) to rank and recommend songs, with a short explanation for each pick. This final version keeps that core and adds an integrated reliability layer — confidence scoring, input guardrails, logging, and an automated reliability harness — so the system can tell how trustworthy each recommendation is and fail safely on bad input.
 
-This version simulates a content-based music recommender. Given a
-user's favorite genre, favorite mood, and target energy level, it
-scores every song in a 16-song catalog and returns the top 5 matches
-with plain-language reasons for each score.
+Summary
 
----
+The system recommends songs from a dataset based on a user's genre, mood, and energy preferences. On top of the original scoring, every recommendation now receives a confidence score (0-1) and label (high/medium/low). Low-confidence matches are flagged rather than presented as strong picks, so a weak recommendation no longer looks like a good one. Bad input is caught by guardrails, and every run is logged for auditing.
 
-## How The System Works
+Architecture Overview
 
-Real platforms like Spotify use two main approaches. Collaborative
-filtering predicts what you'll like based on what similar users liked
-(e.g. "people who liked X also liked Y"), using no info about the song
-itself. Content-based filtering predicts what you'll like based on the
-song's own attributes (genre, tempo, energy, mood) compared to your
-taste profile. Most real systems combine both; collaborative filtering
-handles discovery and cold start, content-based handles fine-grained
-"vibe" matching.
+See diagrams/architecture.mmd for the full diagram. Data flows as:
 
-This simulation is a content-based recommender only. It has no
-knowledge of other users — it only compares song attributes to a
-single taste profile.
+User profile input (genre, mood, energy)
+Guardrails validate the profile (bad input raises a clear error; unknown genres/moods produce warnings instead of crashing)
+Recommender scores every song in data/songs.csv and ranks them
+Confidence layer normalizes each score to a 0-1 confidence and labels it
+Display shows results and flags low-confidence matches
 
-**Song features used:** genre, mood, energy, tempo_bpm, valence,
-danceability, acousticness
+A logger records every run and warning to logs/recommender.log. A reliability harness runs several profiles and writes a pass/fail report to assets/reliability_report.txt, and a pytest suite verifies the recommender, confidence, and guardrail logic.
 
-**UserProfile features used:** favorite genre, favorite mood, target
-energy
+Setup
+python -m venv .venv
+source .venv/bin/activate      # Mac/Linux
+.venv\Scripts\activate         # Windows
+pip install -r requirements.txt
 
-**Scoring:** each song gets +2.0 for a genre match, +1.0 for a mood
-match, and up to +1.0 more based on how close its energy is to the
-user's target energy (full points at 0 gap, scaling down as the gap
-grows).
+Run the recommender:
 
-**Ranking:** every song in the catalog is scored this way, then sorted
-highest score to lowest, and the top k are returned as recommendations.
+python -m src.main
 
-**Expected bias:** this system relies on exact genre-string matching,
-so it may under-rank songs that are a good vibe fit but labeled with
-a different (though related) genre — e.g. "pop" and "indie pop" score
-as a complete mismatch even though they're musically close.
+Run the reliability harness:
 
----
+python -m src.reliability_harness
 
-## Getting Started
+Run the tests:
 
-### Setup
-
-1. Create a virtual environment (optional but recommended):
-
-```bash
-   python -m venv .venv
-   source .venv/bin/activate      # Mac or Linux
-   .venv\Scripts\activate         # Windows
-```
-
-2. Install dependencies
-
-```bash
-   pip install -r requirements.txt
-```
-
-3. Run the app:
-
-```bash
-   python -m src.main
-```
-
-### Running Tests
-
-Run the starter tests with:
-
-```bash
 python -m pytest
-```
+Sample Interactions
+Strong match (Happy Pop profile): Top recommendations: Sunrise City - Score: 3.98 | Confidence: 0.99 (high) Because: ['genre match (+2.0)', 'mood match (+1.0)', 'energy closeness (+0.98)'] Gym Hero - Score: 2.87 | Confidence: 0.72 (high) Because: ['genre match (+2.0)', 'energy closeness (+0.87)'] Night Drive Loop - Score: 0.95 | Confidence: 0.24 (low) [LOW CONFIDENCE - weak match] Because: ['energy closeness (+0.95)']
+Guardrail warning (unknown genre "polka"): [!] Input warnings: - genre 'polka' matches no song in the dataset; recommendations will rely on mood and energy only. Top recommendations: ...
+Reliability harness output: [PASS] Happy Pop top confidence: 0.99 [PASS] Chill Lofi top confidence: 0.99 [PASS] Adversarial EDM+Sad top confidence: 0.63 [PASS] Unknown genre (guardrail) top confidence: 0.45 RESULT: 4/4 cases passed Average top-result confidence: 0.77
+Design Decisions
+Confidence as normalized score. Confidence is the raw score divided by the maximum possible score (4.0), clamped to 0-1. This is simple and explainable, though it assumes the max is fixed; a learned calibration would be more accurate but far less transparent.
+Warnings vs. errors. Hard problems (missing fields, out-of-range energy) raise errors; soft problems (a genre absent from the dataset) return warnings so the system still produces useful results. This favors graceful degradation over strictness.
+Two scoring paths kept. The original dict-based functions and the OOP Recommender class both remain, so existing tests keep passing while the new layer builds on the dict path used by the CLI.
+Testing Summary
 
-You can add more tests in `tests/test_recommender.py`.
+11 of 11 automated tests pass, covering the recommender, confidence normalization and labeling, and all guardrail cases. The reliability harness passes 4/4 profiles (including an adversarial genre+mood mismatch and an unknown-genre guardrail test) with an average top-result confidence of 0.77. The main limitation surfaced by testing: confidence reflects only how well a song matches the stated profile, not whether the recommendation is genuinely good — a mismatched profile can still yield medium confidence from energy alone.
 
----
+Reflection
 
-## Sample Recommendation Output
-
-Top recommendations:
-Sunrise City - Score: 3.98
-Because: ['genre match (+2.0)', 'mood match (+1.0)', 'energy closeness (+0.98)']
-Gym Hero - Score: 2.87
-Because: ['genre match (+2.0)', 'energy closeness (+0.87)']
-Rooftop Lights - Score: 1.96
-Because: ['mood match (+1.0)', 'energy closeness (+0.96)']
-Electric Bloom - Score: 1.90
-Because: ['mood match (+1.0)', 'energy closeness (+0.90)']
-Night Drive Loop - Score: 0.95
-Because: ['energy closeness (+0.95)']
-
-**Screenshot or video** *(optional)*: <!-- Insert a screenshot or demo video link here -->
-
----
-
-## Experiments You Tried
-
-Doubled the weight on energy closeness (1.0 → 2.0) and halved the
-genre match weight (2.0 → 1.0) for the Happy Pop profile. Sunrise
-City stayed #1 either way, but songs with no genre match and good
-mood/energy fit (Rooftop Lights, Electric Bloom) jumped above Gym
-Hero, which had a genre match but the wrong mood. This showed the
-ranking is sensitive to weight choices, not just the underlying data.
-
----
-
-## Limitations and Risks
-
-- Works on a tiny catalog (16 songs), so most genres have only 1-2
-  entries, limiting real variety in results.
-- Genre matching is exact-string only — no partial credit for related
-  genres like "pop" vs "indie pop."
-- Has no concept of low confidence — it always returns a top 5 even
-  when no song is really a good match (see the EDM+Sad test in
-  model_card.md).
-- Does not use lyrics, audio, or listening history — only hand-labeled
-  attributes.
-
-You will go deeper on this in your model card.
-
----
-
-## Reflection
-
-Read and complete `model_card.md`:
-
-[**Model Card**](model_card.md)
-
-This project showed how a recommender turns raw data into a
-prediction: it's really just arithmetic (point additions and sorting)
-dressed up as "taste understanding." The scoring weights are design
-choices, not objective truths — changing them changed the ranking
-without changing the underlying data at all. Bias shows up in what the
-system can't express: it has no way to say "I don't have a good match
-for you," and its exact-string genre matching means musically similar
-but differently-labeled songs get treated as complete mismatches.
-
-
+The full responsible-AI reflection — how I collaborated with AI, one helpful and one flawed AI suggestion, and the system's limitations — is in model_card.md.

@@ -1,0 +1,23 @@
+RELIABILITY REPORT - Music Recommender
+==================================================
+
+[PASS] Happy Pop
+  criteria: Top result is a pop, happy, high-confidence match
+  top confidence: 0.99
+
+[PASS] Chill Lofi
+  criteria: Top result is a lofi track with high confidence
+  top confidence: 0.99
+
+[PASS] Adversarial EDM+Sad
+  criteria: System returns results but flags low/medium confidence
+  top confidence: 0.63
+
+[PASS] Unknown genre (guardrail)
+  criteria: Unknown genre produces a warning but does not crash
+  top confidence: 0.45
+  warning: genre 'polka' matches no song in the dataset; recommendations will rely on mood and energy only.
+
+==================================================
+RESULT: 4/4 cases passed
+Average top-result confidence: 0.77

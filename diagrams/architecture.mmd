@@ -1,0 +1,20 @@
+flowchart TD
+    A[User Profile Input<br/>genre, mood, energy] --> B{Guardrails<br/>validate_user_prefs}
+    B -->|invalid| E[ValidationError<br/>fail safely with message]
+    B -->|valid + warnings| C[Recommender<br/>score_song / recommend_songs]
+    D[songs.csv] --> C
+    C --> F[Confidence Layer<br/>annotate_recommendations]
+    F --> G[Display<br/>flag low-confidence matches]
+    B -.warnings.-> H[(Logger<br/>logs/recommender.log)]
+    F -.run summary.-> H
+    I[Reliability Harness<br/>4 test profiles] --> C
+    I --> J[assets/reliability_report.txt<br/>pass/fail + avg confidence]
+    K[pytest suite<br/>11 tests] -.verifies.-> C
+    K -.verifies.-> F
+    K -.verifies.-> B
+
+    style B fill:#ffe0b2
+    style F fill:#c8e6c9
+    style H fill:#e1bee7
+    style I fill:#bbdefb
+    style K fill:#bbdefb
